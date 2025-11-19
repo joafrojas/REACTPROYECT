@@ -23,4 +23,11 @@ cd contacto
 # o: java -jar target\contacto-0.0.1-SNAPSHOT.jar
 ```
 
-- Revisa `contacto/src/main/resources/application.properties` antes de añadir credenciales reales.
+
+html, body, #root {
+  width: 100%;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  background-color: #000; /* global black background */
+}
