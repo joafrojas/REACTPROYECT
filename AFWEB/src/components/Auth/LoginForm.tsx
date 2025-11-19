@@ -1,5 +1,4 @@
-// src/components/Auth/LoginForm.tsx
-
+// Formulario de login (cliente): envía credenciales al backend y guarda token.
 import React, { useState, useRef } from 'react';
 import { type UserData } from '../../utils/validation';
 

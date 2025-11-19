@@ -9,6 +9,8 @@ import lombok.*;
         @UniqueConstraint(columnNames = "correo"),
         @UniqueConstraint(columnNames = "nombre_usuario")
 })
+// Entidad Usuarios: representa la tabla 'usuarios' en la BD.
+// Campos principales: rut, nombre, fecha_nacimiento, correo, nombre_usuario, password, rol, is_admin.
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

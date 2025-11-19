@@ -1,5 +1,4 @@
-
-
+// Página de autenticación: muestra login o register según la vista.
 import React, { useState } from 'react';
 import * as LoginFormModule from '../Auth/LoginForm';
 import * as RegisterFormModule from '../Auth/RegisterForm';

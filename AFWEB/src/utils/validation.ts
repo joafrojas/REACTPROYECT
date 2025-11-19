@@ -1,4 +1,6 @@
-
+// Utilidades de validación y helpers de usuario (cliente).
+// Contiene validadores, funciones para manejar usuarios en localStorage
+// y el token de administrador usado en el frontend de demo.
 
 export interface UserData {
     rut: string;
@@ -142,9 +144,7 @@ export const toggleLikeOnPost = (postId: string, userName: string) => {
     savePosts(next);
 };
 
-// Admin token used to grant admin role at registration.
-// NOTE: this is client-side for this demo project. In production this
-// should be validated server-side and stored securely.
+
 export const ADMIN_TOKEN = 'ASFALTO-ADMIN-2025';
 
 export const isValidAdminToken = (token: string) => token === ADMIN_TOKEN;

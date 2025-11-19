@@ -8,6 +8,7 @@ import java.util.Optional;
 
 @Repository
 public interface UsuariosRepository extends JpaRepository<Usuarios, Long> {
+    // Repositorio JPA para Usuarios. Métodos usados por AuthService.
     Optional<Usuarios> findByNombreUsuario(String nombreUsuario);
     Optional<Usuarios> findByCorreo(String correo);
     Optional<Usuarios> findByRut(String rut);

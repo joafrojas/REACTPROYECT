@@ -12,6 +12,10 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/auth")
 @CrossOrigin(origins = "http://localhost:5173")
 public class AuthController {
+    // Controlador REST para autenticación.
+    // - POST /auth/register: registra usuarios (usa @Valid).
+    // - POST /auth/login: autentica y devuelve token.
+    // CORS: permitido para el frontend de desarrollo en localhost:5173.
 
     private final AuthService authService;
 

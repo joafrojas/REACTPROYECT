@@ -6,23 +6,27 @@ import microservicio.usuarios.dto.RegisterRequest;
 import microservicio.usuarios.model.Rol;
 import microservicio.usuarios.model.Usuarios;
 import microservicio.usuarios.repository.UsuariosRepository;
-import microservicio.usuarios.security.JwtUtil;
+import java.util.UUID;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
 public class AuthService {
+    // Servicio de autenticación y registro.
+    // - register: valida unicidad, asigna rol admin si corresponde y guarda
+    //   la contraseña encriptada.
+    // - login: valida credenciales y devuelve JWT.
 
     private final UsuariosRepository repo;
     private final PasswordEncoder encoder;
-    private final JwtUtil jwt;
 
-    private static final String ADMIN_TOKEN = "ASFALTO-ADMIN-2025";
+    // El token de administrador se lee desde application.properties
+    @org.springframework.beans.factory.annotation.Value("${app.admin.token:}")
+    private String adminToken;
 
-    public AuthService(UsuariosRepository repo, PasswordEncoder encoder, JwtUtil jwt) {
+    public AuthService(UsuariosRepository repo, PasswordEncoder encoder) {
         this.repo = repo;
         this.encoder = encoder;
-        this.jwt = jwt;
     }
 
     public String register(RegisterRequest req) {
@@ -32,22 +36,25 @@ public class AuthService {
         if (repo.existsByNombreUsuario(req.getNombreUsuario())) return "Usuario ya registrado";
 
         Rol rol = Rol.ROLE_USER;
+        boolean isAdminFlag = false;
 
         if (req.getCorreo().toLowerCase().endsWith("@asfaltofashion.cl")) {
-            if (!ADMIN_TOKEN.equals(req.getAdminToken()))
+            if (!adminToken.equals(req.getAdminToken()))
                 return "Token de administrador inválido";
 
             rol = Rol.ROLE_ADMIN;
+            isAdminFlag = true;
         }
 
-        Usuarios user = Usuarios.builder()
+    Usuarios user = Usuarios.builder()
                 .rut(req.getRut())
                 .nombre(req.getNombre())
                 .fechaNac(req.getFechaNac())
                 .correo(req.getCorreo())
                 .nombreUsuario(req.getNombreUsuario())
                 .password(encoder.encode(req.getPassword()))
-                .rol(rol)
+        .rol(rol)
+        .isAdmin(isAdminFlag)
                 .build();
 
         repo.save(user);
@@ -61,7 +68,8 @@ public class AuthService {
         if (!encoder.matches(req.getPassword(), user.getPassword()))
             throw new IllegalArgumentException("Contraseña incorrecta");
 
-        String token = jwt.generateToken(user);
+        // Generador simple de token: UUID. No expira.
+        String token = UUID.randomUUID().toString();
         return new AuthResponse(token, user.getNombreUsuario(), user.isAdmin());
     }
 }

@@ -1,5 +1,5 @@
-// src/components/Auth/RegisterForm.tsx
-
+// Formulario de registro (cliente): valida campos y llama al backend
+// para crear usuario y hacer login automático.
 import React, { useState, useRef } from 'react';
 import { 
     validarRut, 
