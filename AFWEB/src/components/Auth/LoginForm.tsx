@@ -1,7 +1,7 @@
 // src/components/Auth/LoginForm.tsx
 
 import React, { useState, useRef } from 'react';
-import { getUsers, type UserData } from '../../utils/validation';
+import { type UserData } from '../../utils/validation';
 
 interface LoginFormProps {
     onSuccess: (user: UserData) => void;
@@ -19,36 +19,43 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onSwitchToRegister }) 
     const [showPassword, setShowPassword] = useState(false);
     const passwordRef = useRef<HTMLInputElement | null>(null);
 
-    // Manejo del submit de login: validaciones simples y comprobación local
-    // contra usuarios guardados en localStorage. No hacer aquí hashing ni
-    // comprobaciones seguras — esto es un ejemplo educativo/local.
-    const handleSubmit = (e: React.FormEvent) => {
+    // Manejo del submit de login: validaciones simples y POST al backend
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-    // limpiar errores
-    setFieldErrors({});
-    const errors: Record<string, string> = {};
+        // limpiar errores
+        setFieldErrors({});
+        const errors: Record<string, string> = {};
 
-    // validación básica
-    if (!usuario) errors.usuario = 'Ingresa tu usuario';
-    if (!password) errors.password = 'Ingresa tu contraseña';
-    if (Object.keys(errors).length) return setFieldErrors(errors);
+        // validación básica
+        if (!usuario) errors.usuario = 'Ingresa tu usuario';
+        if (!password) errors.password = 'Ingresa tu contraseña';
+        if (Object.keys(errors).length) return setFieldErrors(errors);
 
-    // buscar usuario registrado por nombre de usuario o nombre mostrado (case-insensitive)
-    const users = getUsers();
-    const needle = usuario.trim().toLowerCase();
-    const found = users.find(u => (u.nombre_usu && u.nombre_usu.toLowerCase() === needle) || (u.nombre && u.nombre.toLowerCase() === needle));
-    if (!found) {
-        setFieldErrors({ usuario: 'Usuario no encontrado. Regístrate o verifica el nombre.' });
-        return;
-    }
-    if (found.password !== password) {
-        setFieldErrors({ password: 'Contraseña incorrecta.' });
-        return;
-    }
+        try {
+            const res = await fetch('http://localhost:8081/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ usernameOrEmail: usuario, password }),
+            });
+            if (!res.ok) {
+                const text = await res.text();
+                setFieldErrors({ password: text || 'Credenciales inválidas' });
+                return;
+            }
+            const json = await res.json();
+            const token = json.token;
+            const username = json.username || usuario;
+            const isAdmin = !!json.isAdmin;
 
-    // éxito: guardar sesión (incluye correo para detección admin)
-    localStorage.setItem('currentUser', JSON.stringify({ nombre_usu: found.nombre_usu, nombre: found.nombre, correo: found.correo }));
-    onSuccess(found as UserData);
+            // guardar token y usuario mínimo
+            localStorage.setItem('authToken', token);
+            localStorage.setItem('currentUser', JSON.stringify({ nombre_usu: username, correo: '', isAdmin }));
+
+            const userAny = { rut: '', nombre: '', fecha_nac: '', correo: '', nombre_usu: username, password: '' } as any;
+            onSuccess(userAny as UserData);
+        } catch (err: any) {
+            setFieldErrors({ password: err?.message || 'Error conectando al servidor' });
+        }
     };
 
     return (

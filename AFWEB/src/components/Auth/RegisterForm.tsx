@@ -7,13 +7,13 @@ import {
     validarPassword, 
     validarEdad,
     getUsers, 
-    saveUser,
     isValidAdminToken,
 } from '../../utils/validation';
 import type { UserData } from '../../utils/validation';
 
 interface RegisterFormProps {
-    onSuccess: () => void; // Función para cambiar a Login al registrarse
+    // onSuccess puede recibir opcionalmente el usuario autenticado (tras auto-login)
+    onSuccess: (user?: UserData) => void;
 }
 
 const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
@@ -51,11 +51,8 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
         setError('');
     };
 
-    // Manejo del submit del registro: realiza validaciones básicas y guarda
-    // el usuario en localStorage mediante `saveUser`. Esta lógica es local
-    // y educativa; en producción habría que enviar los datos a un backend
-    // con control de contraseñas y validaciones en servidor.
-    const handleSubmit = (e: React.FormEvent) => {
+    // Manejo del submit del registro: validaciones y llamada al backend
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
         setSuccess('');
@@ -87,14 +84,58 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
             // ignore
         }
 
-        // 3. guardar usuario (localStorage)
-        const toSave = { ...formData, ...(isAdminFlag ? { isAdmin: true } : {}) } as any;
-        saveUser(toSave);
-        setSuccess('Registro exitoso. Serás redirigido a Iniciar Sesión.');
-        
-        setTimeout(() => {
-            onSuccess();
-        }, 1500); 
+        // 3. enviar al backend
+        const payload: any = {
+            rut: formData.rut,
+            nombre: formData.nombre,
+            fechaNac: formData.fecha_nac,
+            correo: formData.correo,
+            nombreUsuario: formData.nombre_usu,
+            password: formData.password,
+        };
+        if (isAdminFlag && adminToken.trim()) payload.adminToken = adminToken.trim();
+
+        try {
+            const res = await fetch('http://localhost:8081/auth/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            const text = await res.text();
+            if (!res.ok) {
+                setError(typeof text === 'string' ? text : 'Error en registro');
+                return;
+            }
+
+            // al registrarse correctamente, intentar login automático
+            setSuccess('Registro exitoso. Iniciando sesión...');
+            const loginRes = await fetch('http://localhost:8081/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ usernameOrEmail: payload.nombreUsuario, password: payload.password }),
+            });
+            if (!loginRes.ok) {
+                // redirigir a login si no se pudo autenticar automáticamente
+                setSuccess('Registro correcto. Por favor inicia sesión.');
+                setTimeout(() => onSuccess(), 1500);
+                return;
+            }
+            const loginJson = await loginRes.json();
+            // loginJson expected: { token, username, isAdmin }
+            const token = loginJson.token;
+            const username = loginJson.username || payload.nombreUsuario;
+            const isAdmin = !!loginJson.isAdmin;
+
+            // guardar token y user mínimo en localStorage
+            localStorage.setItem('authToken', token);
+            localStorage.setItem('currentUser', JSON.stringify({ nombre_usu: username, correo: payload.correo, isAdmin }));
+
+            // notificar al app que inició sesión
+            const userAny = { rut: payload.rut, nombre: payload.nombre, fecha_nac: payload.fechaNac, correo: payload.correo, nombre_usu: username, password: '' } as any;
+            onSuccess(userAny);
+        } catch (err: any) {
+            setError(err?.message || 'Error conectando al servidor');
+        }
     };
 
     return (
@@ -162,7 +203,7 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
                 {success && <span className="field-success">{success}</span>}
             </div>
             <button type="submit" disabled={!!success} className="btn-primary">Registrar</button>
-            <p className="link">¿Ya tienes cuenta? <a onClick={onSuccess}>Inicia sesión</a></p>
+            <p className="link">¿Ya tienes cuenta? <a onClick={() => onSuccess()}>Inicia sesión</a></p>
         </form>
     );
 };

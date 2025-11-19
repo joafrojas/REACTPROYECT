@@ -76,10 +76,24 @@ export const getActiveUser = (): UserData | null => {
     if (!userJson) return null;
     
     try {
-        const partialUser = JSON.parse(userJson);
+        const partialUser = JSON.parse(userJson) as Partial<UserData>;
         const users = getUsers();
         // Buscar el usuario completo en la base de datos (localStorage)
-        return users.find(u => u.nombre_usu === partialUser.nombre_usu) || null;
+        const found = users.find(u => u.nombre_usu === partialUser.nombre_usu);
+        if (found) return found;
+        // Si no está en la lista local, devolver el currentUser parcial (útil cuando
+        // la app usa un backend para persistir usuarios en lugar de localStorage)
+        if (partialUser && partialUser.nombre_usu) {
+            return {
+                rut: partialUser.rut || '',
+                nombre: partialUser.nombre || '',
+                fecha_nac: (partialUser as any).fecha_nac || '',
+                correo: partialUser.correo || '',
+                nombre_usu: partialUser.nombre_usu || '',
+                password: '',
+            };
+        }
+        return null;
     } catch {
         return null;
     }

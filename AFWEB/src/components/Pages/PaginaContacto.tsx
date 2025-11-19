@@ -103,7 +103,7 @@ const PaginaContacto: React.FC = () => {
                             <p style={{ margin: 0 }}>
                                 <a href="https://instagram.com/joandoprivadamente" target="_blank" rel="noopener noreferrer">@joandoprivadamente</a>
                                 {' '}•{' '}
-                                <a href="https://instagram.com/fravvn.jrr" target="_blank" rel="noopener noreferrer">@fravvn.jrr</a>
+                                <a href="https://instagram.com/frvvn.jrr" target="_blank" rel="noopener noreferrer">@fravvn.jrr</a>
                             </p>
                         </div>
                     </div>

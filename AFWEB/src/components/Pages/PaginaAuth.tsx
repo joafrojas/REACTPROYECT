@@ -21,8 +21,12 @@ const PaginaAuth: React.FC<PaginaAuthProps> = ({ onLoginSuccess }) => {
         onLoginSuccess(user);
     };
 
-    const handleRegisterSuccess = () => {
-        setView('login');
+    const handleRegisterSuccess = (user?: UserData) => {
+        if (user) {
+            onLoginSuccess(user);
+        } else {
+            setView('login');
+        }
     };
 
     return (
