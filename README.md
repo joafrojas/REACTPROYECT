@@ -12,6 +12,7 @@ Frontend (desde `AFWEB`):
 cd AFWEB
 npm install
 npm run dev
+npm install --save-dev @testing-library/react@latest //NO OLVIDAR MI XAMXITOHERMOSO
 ```
 
 Microservicio (desde `contacto`):
