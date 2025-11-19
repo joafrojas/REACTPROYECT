@@ -1,0 +1,48 @@
+/* Estilos mínimos para la página de contacto.
+   Esta hoja existe para evitar dependencias en FFXIV.css y mantener
+   nombres de clases semánticos y específicos para la página de contacto.
+*/
+.contact-page {
+  /* dejar espacio para la NavBar fija (70px) como en el resto del sitio */
+  padding: 110px 20px;
+  min-height: 70vh;
+  background: linear-gradient(180deg, #000000 0%, #a7a5a5 100%);
+  color: #222;
+}
+.contact-header {
+  text-align: center;
+  margin-bottom: 18px;
+}
+.contact-header h1 { font-size: 36px; margin-bottom: 6px; color: #fff; }
+.contact-sub {
+  /* color parecido al utilizado en el resto de la web para subtítulos */
+  color: #a0a0a0;
+  margin-top: 6px;
+}
+.contact-hero {
+  display: flex;
+  justify-content: center;
+  padding: 28px 12px;
+}
+.contact-card {
+  background: #ffffff;
+  padding: 26px;
+  border-radius: 12px;
+  max-width: 920px;
+  width: 100%;
+  box-shadow: 0 12px 30px rgba(20,20,30,0.06);
+}
+.contact-form .form-row { margin-bottom: 12px; }
+.form-error { color: #d64545; font-size: 0.9rem; margin-top: 6px; }
+.success-message { color: #157f3a; margin-bottom: 8px; }
+.contact-card a { color: #1b6fbf; }
+
+
+.contact-grid { display: grid; grid-template-columns: 1fr 360px; gap: 24px; align-items: start; }
+.contact-intro { padding: 6px 10px; }
+.contact-intro p { color: #444; }
+
+@media (max-width: 900px) {
+  .contact-grid { grid-template-columns: 1fr; }
+  .contact-card { padding: 18px; }
+}
