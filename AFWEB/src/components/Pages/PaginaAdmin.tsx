@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import NavBar from '../NavBar';
 import '../../styles/Admin.css';
-import { getPosts, savePosts, getUsers, saveUsers } from '../../utils/validation';
+import { getPosts, savePosts, getUsers, saveUsers, getActiveUser } from '../../utils/validation';
 
 // Página administrativa: listado de posts, usuarios y comentarios.
 // Nota: esta vista está pensada como una herramienta de inspección local
@@ -30,6 +30,11 @@ const PaginaAdmin: React.FC = () => {
 
   const deleteUser = (nombre_usu: string) => {
     try {
+      const active = getActiveUser();
+      if (!active || !(active as any).isAdmin) {
+        try { alert('No autorizado. Solo administradores pueden eliminar usuarios.'); } catch (e) {}
+        return;
+      }
       const reason = window.prompt(`Razón para eliminar el usuario ${nombre_usu} (opcional):`);
       // Si el usuario cancela el prompt, no hacemos nada
       if (reason === null) return;
@@ -138,6 +143,9 @@ const PaginaAdmin: React.FC = () => {
                     <div className="admin-item-body">
                       <strong>{u.nombre}</strong>
                       <div className="admin-meta">{u.nombre_usu} — {u.correo}</div>
+                      <div style={{ fontSize: 13, color: '#ccc', marginTop: 6 }}>
+                        Fecha Nac: {u.fecha_nac || '—'} • Creado: {u.createdAt ? new Date(u.createdAt).toLocaleString() : '—'}
+                      </div>
                     </div>
                     <div className="admin-actions">
                       <button onClick={() => toggleAdmin(u.nombre_usu)} className="btn-secondary">{u.isAdmin ? 'Quitar admin' : 'Dar admin'}</button>

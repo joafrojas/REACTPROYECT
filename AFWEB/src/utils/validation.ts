@@ -9,6 +9,7 @@ export interface UserData {
     correo: string;
     nombre_usu: string;
     password: string;
+    createdAt?: string;
 }
 // Nota: permitimos un flag opcional `isAdmin` para marcar administradores
 export interface UserDataWithAdmin extends UserData { isAdmin?: boolean }
@@ -57,6 +58,8 @@ export const getUsers = (): UserData[] => {
 
 export const saveUser = (newUser: UserData): void => {
     const users = getUsers();
+    // Asegurar createdAt para usuarios guardados localmente
+    if (!newUser.createdAt) newUser.createdAt = new Date().toISOString();
     users.push(newUser);
     localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(users));
     window.dispatchEvent(new Event('asfalto_users_updated')); 
@@ -93,6 +96,7 @@ export const getActiveUser = (): UserData | null => {
                 correo: partialUser.correo || '',
                 nombre_usu: partialUser.nombre_usu || '',
                 password: '',
+                createdAt: (partialUser as any).createdAt || '',
             };
         }
         return null;

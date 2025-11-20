@@ -70,6 +70,6 @@ public class AuthService {
 
         // Generador simple de token: UUID. No expira.
         String token = UUID.randomUUID().toString();
-        return new AuthResponse(token, user.getNombreUsuario(), user.isAdmin());
+        return new AuthResponse(token, user.getNombreUsuario(), user.isAdmin(), user.getCreatedAt());
     }
 }

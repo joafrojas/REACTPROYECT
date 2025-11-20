@@ -47,5 +47,13 @@ public class Usuarios {
     @Enumerated(EnumType.STRING)
     @Column(name = "rol", nullable = false, length = 50)
     private Rol rol = Rol.ROLE_USER;
+    
+    @Column(name = "created_at")
+    private String createdAt;
+
+    @PrePersist
+    protected void onCreate() {
+        if (this.createdAt == null) this.createdAt = java.time.OffsetDateTime.now().toString();
+    }
 }
 

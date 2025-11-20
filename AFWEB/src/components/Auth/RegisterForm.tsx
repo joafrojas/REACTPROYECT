@@ -9,6 +9,7 @@ import {
     getUsers, 
     isValidAdminToken,
 } from '../../utils/validation';
+import { saveUser } from '../../utils/validation';
 import type { UserData } from '../../utils/validation';
 
 interface RegisterFormProps {
@@ -121,17 +122,19 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess }) => {
                 return;
             }
             const loginJson = await loginRes.json();
-            // loginJson expected: { token, username, isAdmin }
+            // loginJson expected: { token, username, isAdmin, createdAt }
             const token = loginJson.token;
             const username = loginJson.username || payload.nombreUsuario;
             const isAdmin = !!loginJson.isAdmin;
+            const createdAt = loginJson.createdAt || '';
 
-            // guardar token y user mínimo en localStorage
+            // guardar token y user mínimo en localStorage (incluye createdAt)
             localStorage.setItem('authToken', token);
-            localStorage.setItem('currentUser', JSON.stringify({ nombre_usu: username, correo: payload.correo, isAdmin }));
+            localStorage.setItem('currentUser', JSON.stringify({ nombre_usu: username, correo: payload.correo, isAdmin, createdAt }));
 
-            // notificar al app que inició sesión
-            const userAny = { rut: payload.rut, nombre: payload.nombre, fecha_nac: payload.fechaNac, correo: payload.correo, nombre_usu: username, password: '' } as any;
+            // persistir usuario en localStorage para panel admin local (demo)
+            const userAny = { rut: payload.rut, nombre: payload.nombre, fecha_nac: payload.fechaNac, correo: payload.correo, nombre_usu: username, password: '', createdAt } as any;
+            try { saveUser(userAny); } catch (e) {}
             onSuccess(userAny);
         } catch (err: any) {
             setError(err?.message || 'Error conectando al servidor');

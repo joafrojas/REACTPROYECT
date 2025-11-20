@@ -11,4 +11,5 @@ public class AuthResponse {
     private String token;
     private String username;
     private boolean isAdmin;
+    private String createdAt;
 }

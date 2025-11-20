@@ -45,12 +45,13 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSuccess, onSwitchToRegister }) 
             const token = json.token;
             const username = json.username || usuario;
             const isAdmin = !!json.isAdmin;
+            const createdAt = json.createdAt || '';
 
-            // guardar token y usuario mínimo
+            // guardar token y usuario mínimo (incluye createdAt)
             localStorage.setItem('authToken', token);
-            localStorage.setItem('currentUser', JSON.stringify({ nombre_usu: username, correo: '', isAdmin }));
+            localStorage.setItem('currentUser', JSON.stringify({ nombre_usu: username, correo: '', isAdmin, createdAt }));
 
-            const userAny = { rut: '', nombre: '', fecha_nac: '', correo: '', nombre_usu: username, password: '' } as any;
+            const userAny = { rut: '', nombre: '', fecha_nac: '', correo: '', nombre_usu: username, password: '', createdAt } as any;
             onSuccess(userAny as UserData);
         } catch (err: any) {
             setFieldErrors({ password: err?.message || 'Error conectando al servidor' });

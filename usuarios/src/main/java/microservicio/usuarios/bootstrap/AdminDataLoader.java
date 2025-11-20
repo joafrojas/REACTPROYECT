@@ -28,7 +28,6 @@ public class AdminDataLoader {
                     System.out.println("Admin creado: admin / admin");
                 }
             } catch (Exception e) {
-                // No interrumpir el arranque si hay problema
                 System.out.println("No se pudo crear admin: " + e.getMessage());
             }
         };

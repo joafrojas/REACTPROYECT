@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import NavBar from '../NavBar';
 import '../../styles/FFXIV.css';
 import '../../styles/Post.css';
-import { getPosts, addCommentToPost, toggleLikeOnPost, getActiveUser } from '../../utils/validation';
+import { getActiveUser } from '../../utils/validation';
 
 /*
     PaginaPost
@@ -11,53 +11,38 @@ import { getPosts, addCommentToPost, toggleLikeOnPost, getActiveUser } from '../
     - Los cambios se guardan en localStorage usando los helpers en utils/validation.ts.
 */
 
-const safeParsePosts = (fallback: any[]) => {
-    try {
-        const raw = localStorage.getItem('asfalto_posts');
-        if (raw) {
-            const parsed = JSON.parse(raw);
-            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-        }
-    } catch (e) {
-       
-    }
-    return fallback;
-};
+// Ahora cargamos la publicación desde el microservicio `foro` en vez de localStorage
 
 const PaginaPost: React.FC = () => {
     const path = typeof window !== 'undefined' ? window.location.pathname : '/';
     const id = path.startsWith('/post/') ? path.replace('/post/', '') : '';
 
     
-    const FALLBACK = [
-        { id: 'p1', image: '/IMG/marlon.jpg', title: 'Marlon Fashion LOOKBOOK', category: 'EDITORIAL', author: 'ASFALTOSFASHION', date: '2025-10-20' },
-        { id: 'p2', image: '/IMG/central.jpg', title: 'Central Look LOOKBOOK', category: 'PERFIL', author: 'USUARIO_ASFALTO', date: '2025-10-18' },
-        { id: 'p3', image: '/IMG/kuroh.jpg', title: 'Kuroh Style LOOKBOOK', category: 'COLECCIONES', author: 'USUARIO_ASFALTO', date: '2025-10-15' },
-    ];
+    
 
-    const [post, setPost] = useState<any>(() => {
-        // Inicializar el estado de la publicación de forma síncrona usando localStorage
-        const all = safeParsePosts(FALLBACK);
-        let found = all.find((p: any) => p.id === id);
-        // En entornos de test donde la ruta no se puede mutar correctamente,
-        // si solo hay una publicación en storage asumimos que es la deseada.
-        if (!found && (!id || id === '') && all.length === 1) found = all[0];
-        return found || null;
-    });
+    const [post, setPost] = useState<any>(null);
     const [commentText, setCommentText] = useState('');
     const [commentError, setCommentError] = useState('');
 
-    // Cargar la publicación desde localStorage (o fallback) al montar
+    // Cargar la publicación desde el microservicio foro
     useEffect(() => {
-        // Listener para actualizaciones externas (otra pestaña) de posts
-        const onUpdated = () => {
-            const latest = safeParsePosts(FALLBACK);
-            let updated = latest.find((p: any) => p.id === id);
-            if (!updated && (!id || id === '') && latest.length === 1) updated = latest[0];
-            setPost(updated || null);
+        let mounted = true;
+        const fetchPost = async () => {
+            if (!id) return;
+            try {
+                const res = await fetch(`http://localhost:8082/api/posts/${id}`);
+                if (!res.ok) {
+                    setPost(null);
+                    return;
+                }
+                const json = await res.json();
+                if (mounted) setPost(json);
+            } catch (e) {
+                setPost(null);
+            }
         };
-        window.addEventListener('asfalto_posts_updated', onUpdated as EventListener);
-        return () => window.removeEventListener('asfalto_posts_updated', onUpdated as EventListener);
+        fetchPost();
+        return () => { mounted = false; };
     }, [id]);
 
     return (
@@ -66,7 +51,11 @@ const PaginaPost: React.FC = () => {
             <main className="ffxiv-page">
                 <header className="ffxiv-header">
                     <h1>{post ? post.title : 'Publicación no encontrada'}</h1>
-                    {post ? <p className="ffxiv-sub">{post.category} • Por {post.author} — {post.date}</p> : null}
+                    {post ? (
+                        <p className="ffxiv-sub">
+                            {post.category} • Por {post.author || post.authorId} — {post.date || (post.createdAt ? new Date(post.createdAt).toLocaleDateString() : '')}
+                        </p>
+                    ) : null}
                 </header>
 
                 {post ? (
@@ -77,15 +66,21 @@ const PaginaPost: React.FC = () => {
                         <div style={{ marginTop: 16, display: 'flex', gap: 12, alignItems: 'center' }}>
                             <button
                                 className="btn-like"
-                                onClick={() => {
+                                onClick={async () => {
                                     const user = getActiveUser();
                                     if (!user) return alert('Inicia sesión para dar like.');
                                     try {
-                                        toggleLikeOnPost(post.id, user.nombre_usu);
-                                        // actualizar estado local releyendo posts
-                                        const updated = getPosts().find((p:any) => p.id === post.id);
-                                        setPost(updated || null);
-                                    } catch (e) {}
+                                        const res = await fetch(`http://localhost:8082/api/posts/${post.id}/likes`, {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify(user.nombre_usu),
+                                        });
+                                        if (!res.ok) return;
+                                        const updated = await res.json();
+                                        setPost(updated);
+                                    } catch (e) {
+                                        // ignore
+                                    }
                                 }}
                                 aria-pressed={post.likes && getActiveUser() && post.likes.includes(getActiveUser()!.nombre_usu)}
                             >
@@ -100,11 +95,11 @@ const PaginaPost: React.FC = () => {
                                 <div style={{ marginBottom: 12 }}>
                                     {post.comments.map((c:any) => (
                                         <div key={c.id} className="comment-item">
-                                            <div className="comment-avatar">{(c.user || 'U').slice(0,1).toUpperCase()}</div>
+                                            <div className="comment-avatar">{(c.userId || 'U').slice(0,1).toUpperCase()}</div>
                                             <div className="comment-body">
                                                 <div className="comment-meta">
-                                                    <strong className="comment-user">{c.user}</strong>
-                                                    <span className="comment-date">{new Date(c.date).toLocaleString()}</span>
+                                                    <strong className="comment-user">{c.userId}</strong>
+                                                    <span className="comment-date">{new Date(c.createdAt || c.date).toLocaleString()}</span>
                                                 </div>
                                                 <div className="comment-text">{c.text}</div>
                                             </div>
@@ -132,16 +127,25 @@ const PaginaPost: React.FC = () => {
                                     <div>
                                         <button
                                             className="btn-primary"
-                                            onClick={() => {
+                                            onClick={async () => {
                                                 const user = getActiveUser();
                                                 if (!user) { alert('Inicia sesión para comentar.'); return; }
                                                 const text = (commentText || '').trim();
                                                 if (!text) { setCommentError('El comentario debe contener al menos 1 carácter.'); return; }
-                                                const comment = { id: `c${Date.now()}`, user: user.nombre_usu, text, date: new Date().toISOString() };
+                                                const payload = { userId: user.nombre_usu, text };
                                                 try {
-                                                    addCommentToPost(post.id, comment);
-                                                    const updated = getPosts().find((p:any) => p.id === post.id);
-                                                    setPost(updated || null);
+                                                    const res = await fetch(`http://localhost:8082/api/posts/${post.id}/comments`, {
+                                                        method: 'POST',
+                                                        headers: { 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify(payload),
+                                                    });
+                                                    if (!res.ok) { setCommentError('Error al guardar el comentario. Intenta de nuevo.'); return; }
+                                                    // obtener post actualizado
+                                                    const updatedRes = await fetch(`http://localhost:8082/api/posts/${post.id}`);
+                                                    if (updatedRes.ok) {
+                                                        const updated = await updatedRes.json();
+                                                        setPost(updated);
+                                                    }
                                                     setCommentText('');
                                                     setCommentError('');
                                                 } catch (e) {

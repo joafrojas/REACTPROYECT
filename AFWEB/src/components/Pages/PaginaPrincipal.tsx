@@ -57,18 +57,7 @@ import { getPosts as loadStoredPosts, savePosts as persistPosts } from '../../ut
 
 const PaginaPrincipal: React.FC<PaginaPrincipalProps> = ({ currentUser, onLogout }) => {
     // estado: lista de posts (inicializamos leyendo localStorage para evitar sobreescribirlo)
-    const [posts, setPosts] = useState<Post[]>(() => {
-        try {
-            const parsed = loadStoredPosts();
-            if (Array.isArray(parsed) && parsed.length > 0) {
-                parsed.sort((a: Post, b: Post) => new Date(b.date).getTime() - new Date(a.date).getTime());
-                return parsed as Post[];
-            }
-        } catch (e) {
-            // ignore
-        }
-        return MOCK_GRID_POSTS.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    });
+    const [posts, setPosts] = useState<Post[]>([]);
     // NOTE: los comentarios se muestran únicamente en la vista detalle (/post/:id).
     // En la cuadrícula dejamos solo el botón de "like" (contador), para evitar
     // duplicar la UI de comentarios en dos sitios.
@@ -77,8 +66,16 @@ const PaginaPrincipal: React.FC<PaginaPrincipalProps> = ({ currentUser, onLogout
     // modal de subida abierto?
     const [uploadOpen, setUploadOpen] = useState<boolean>(false);
 
-    // categorías disponibles (memorizadas)
-    const categories = useMemo(() => ['todos', ...Array.from(new Set(posts.map(p => p.category.toLowerCase())))], [posts]);
+    // categorías disponibles (memorizadas) — combinamos defaults + las reales detectadas
+    const categories = useMemo(() => {
+        const DEFAULT_CATS = ['editorial', 'perfil', 'colecciones', 'desfiles'];
+        const set = new Set<string>(DEFAULT_CATS);
+        posts.forEach(p => {
+            const cat = (p.category || '').toString().trim();
+            if (cat) set.add(cat.toLowerCase());
+        });
+        return Array.from(set);
+    }, [posts]);
     // posts filtrados según categoría
     const displayedPosts = useMemo(() => {
         if (filter === 'todos') return posts;
@@ -91,8 +88,47 @@ const PaginaPrincipal: React.FC<PaginaPrincipalProps> = ({ currentUser, onLogout
 
  
     // crear nuevo post y añadir al estado
-    const addPost = (data: { title: string; category: string; image: string }) => {
-        const newPost: Post = {
+    const addPost = async (data: { title: string; category: string; image?: string; imageFile?: File }) => {
+        // Si hay un archivo, enviamos multipart/form-data al backend
+        if (data.imageFile) {
+            const form = new FormData();
+            form.append('title', data.title || 'Nueva publicación');
+            form.append('content', '');
+            form.append('category', (data.category || 'EDITORIAL').toUpperCase());
+            form.append('authorId', currentUser?.nombre_usu || 'USUARIO_ASFALTO');
+            form.append('imageFile', data.imageFile);
+            try {
+                const res = await fetch('http://localhost:8082/api/posts', {
+                    method: 'POST',
+                    body: form,
+                });
+                if (res.ok) {
+                    const created = await res.json();
+                    const newPost: Post = {
+                        id: created.externalId || `p${Date.now()}`,
+                        image: created.image || data.image || '/IMG/placeholder.jpg',
+                        title: created.title || data.title || 'Nueva publicación',
+                        category: (created.category || data.category || 'EDITORIAL').toUpperCase(),
+                        author: created.authorId || currentUser?.nombre_usu || 'USUARIO_ASFALTO',
+                        date: created.createdAt ? (created.createdAt.split('T')[0]) : new Date().toISOString().split('T')[0],
+                        likes: created.likes || [],
+                        comments: created.comments || [],
+                    };
+                    setPosts(prev => [newPost, ...prev]);
+                    try { persistPosts([newPost, ...posts]); } catch (e) {}
+                    setFilter('todos');
+                    setUploadOpen(false);
+                    const goto = created.externalId ? `/post/${created.externalId}` : `/post/${newPost.id}`;
+                    window.location.href = goto;
+                    return;
+                }
+            } catch (err) {
+                // continuar al fallback
+            }
+        }
+
+        // Fallback: si no hay archivo o backend falla, guardamos localmente
+        const fallbackPost: Post = {
             id: `p${Date.now()}`,
             image: data.image || '/IMG/placeholder.jpg',
             title: data.title || 'Nueva publicación',
@@ -100,12 +136,58 @@ const PaginaPrincipal: React.FC<PaginaPrincipalProps> = ({ currentUser, onLogout
             author: currentUser.nombre_usu || 'USUARIO_ASFALTO',
             date: new Date().toISOString().split('T')[0],
         };
-        setPosts(prev => [newPost, ...prev]);
-        const next = [newPost, ...posts];
+        setPosts(prev => [fallbackPost, ...prev]);
+        const next = [fallbackPost, ...posts];
         try { persistPosts(next); } catch (e) {}
         setFilter('todos');
         setUploadOpen(false);
     };
+
+    // Cargar posts desde el backend al montar el componente. Si falla, usamos localStorage o mocks.
+    useEffect(() => {
+        let mounted = true;
+        (async () => {
+            try {
+                const res = await fetch('http://localhost:8082/api/posts');
+                if (res.ok) {
+                    const body = await res.json();
+                    if (!mounted) return;
+                    // body is an array of summaries: { id, externalId, title, image, createdAt }
+                    const fromServer: Post[] = (body || []).map((p: any) => ({
+                        id: p.externalId || String(p.id),
+                        image: p.image || '/IMG/placeholder.jpg',
+                        title: p.title || 'Sin título',
+                        category: (p.category || 'EDITORIAL').toUpperCase(),
+                        author: p.authorId || 'USUARIO_ASFALTO',
+                        date: p.createdAt ? p.createdAt.split('T')[0] : new Date().toISOString().split('T')[0],
+                        likes: p.likes || [],
+                        comments: p.comments || [],
+                    }));
+                    setPosts(fromServer);
+                    try { persistPosts(fromServer); } catch (e) {}
+                    return;
+                }
+            } catch (err) {
+                // ignore fetch errors and fallback below
+            }
+
+            // Fallback: intentar cargar desde localStorage
+            try {
+                const parsed = loadStoredPosts();
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    parsed.sort((a: Post, b: Post) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                    if (mounted) setPosts(parsed as Post[]);
+                    return;
+                }
+            } catch (e) {
+                // ignore
+            }
+
+            // Último fallback: mocks
+            if (mounted) setPosts(MOCK_GRID_POSTS.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+        })();
+        return () => { mounted = false; };
+    }, []);
 
   
     // guardar posts en localStorage cuando cambian
@@ -176,6 +258,14 @@ const PaginaPrincipal: React.FC<PaginaPrincipalProps> = ({ currentUser, onLogout
                 {/* 2. FILTROS DE CATEGORÍA (Pegajosos/Sticky) */}
                 <div className="filters-sticky" role="region" aria-label="Filtros de categoría">
                     <div className="filter-chips">
+                        <button
+                            key={'todos'}
+                            onClick={() => setFilter('todos')}
+                            className={`chip ${filter === 'todos' ? 'active' : ''}`}
+                            aria-pressed={filter === 'todos'}
+                        >
+                            TODOS
+                        </button>
                         {categories.map(cat => (
                             <button
                                 key={cat}
@@ -183,7 +273,7 @@ const PaginaPrincipal: React.FC<PaginaPrincipalProps> = ({ currentUser, onLogout
                                 className={`chip ${filter === cat ? 'active' : ''}`}
                                 aria-pressed={filter === cat}
                             >
-                                {cat === 'todos' ? 'TODOS' : cat.toUpperCase()}
+                                {cat.toUpperCase()}
                             </button>
                         ))}
                     </div>
@@ -275,13 +365,14 @@ const FloatingUploadButton: React.FC<{
     onOpen: () => void;
     onClose: () => void;
     categories: string[];
-    onCreate: (data: { title: string; category: string; image: string }) => void;
+    onCreate: (data: { title: string; category: string; image?: string; imageFile?: File }) => void;
     currentUserName?: string;
 }> = ({ open, onOpen, onClose, categories, onCreate, currentUserName }) => {
     const [title, setTitle] = useState('');
-    const [category, setCategory] = useState<string>(categories[0] || 'todos');
-
+    // Default to first available category (lowercase) or a sensible fallback
+    const [category, setCategory] = useState<string>(categories[0] || 'editorial');
     const [image, setImage] = useState<string>('');
+    const [imageFile, setImageFile] = useState<File | null>(null);
     const [imageFileName, setImageFileName] = useState<string>('');
     const [uploadError, setUploadError] = useState<string>('');
 
@@ -296,6 +387,7 @@ const FloatingUploadButton: React.FC<{
     const handleFileChange = (ev: React.ChangeEvent<HTMLInputElement>) => {
         const f = ev.target.files && ev.target.files[0];
         if (!f) return;
+        setImageFile(f);
         setImageFileName(f.name || '');
         const reader = new FileReader();
         reader.onload = () => {
@@ -312,11 +404,11 @@ const FloatingUploadButton: React.FC<{
             setUploadError('El título es obligatorio.');
             return;
         }
-        if (!image) {
+        if (!imageFile && !image) {
             setUploadError('Adjunta una imagen (archivo) antes de publicar.');
             return;
         }
-        onCreate({ title, category: category === 'todos' ? 'EDITORIAL' : category, image: image });
+        onCreate({ title, category: category === 'todos' ? 'EDITORIAL' : category, image: image, imageFile: imageFile || undefined });
         setTitle('');
         setImage('');
         setImageFileName('');
@@ -342,9 +434,13 @@ const FloatingUploadButton: React.FC<{
 
                             <label>Categoría</label>
                             <select value={category} onChange={e => setCategory(e.target.value)}>
-                                {categories.map(c => (
-                                    <option key={c} value={c}>{c === 'todos' ? 'TODOS' : c.toUpperCase()}</option>
-                                ))}
+                                {categories.length === 0 ? (
+                                    <option value="editorial">EDITORIAL</option>
+                                ) : (
+                                    categories.map(c => (
+                                        <option key={c} value={c}>{c.toUpperCase()}</option>
+                                    ))
+                                )}
                             </select>
 
                             <label>Imagen (archivo)</label>
